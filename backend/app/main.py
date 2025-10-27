@@ -4,21 +4,26 @@ import os, uuid, traceback
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.schemas import *
+from app.schemas import (
+    UploadResp, DocMeta, SummaryResp, SummarySection,
+    Flashcard, QuizItem, ChatSessionResp, ChatMessageResp
+)
 from app.services.ingest import extract_text, chunk_text
 from app.services.vector import upsert_doc, search_similar
 from app.services.ai import summarize_overall, answer_with_context
 
+# In-memory (sau thay DB)
 DOCS: dict[str, DocMeta] = {}
 DOC_TEXT: dict[str, str] = {}
 
 app = FastAPI(title="Study Assistant API", version="0.3")
 
-origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+# CORS
+origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in origins if o.strip()],
@@ -66,12 +71,11 @@ async def upload_document(file: UploadFile = File(...)):
         return UploadResp(doc_id=doc_id)
 
     except Exception as e:
-        # LOG chi tiết để bạn nhìn được nguyên nhân gốc trong console
         print("ERROR upload_document:", repr(e))
         traceback.print_exc()
         DOCS[doc_id].status = "failed"
         DOCS[doc_id].message = str(e)
-        # vẫn trả 200 để FE cập nhật trạng thái 'failed'
+        # vẫn trả 200 để FE có thể hiện 'failed'
         return UploadResp(doc_id=doc_id)
 
 @app.get("/documents/{doc_id}", response_model=DocMeta)
@@ -121,7 +125,8 @@ def create_chat_session(doc_id: str | None = None):
     return ChatSessionResp(session_id=str(uuid.uuid4()))
 
 @app.post("/chat/message", response_model=ChatMessageResp)
-def chat_message(req: dict):
+def chat_message(req: dict = Body(...)):
+    # chấp nhận cả "question" lẫn "q"
     question = (req or {}).get("question") or (req or {}).get("q") or ""
     if not question.strip():
         return JSONResponse(status_code=400, content={"message": "missing question"})

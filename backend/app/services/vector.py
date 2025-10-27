@@ -6,11 +6,11 @@ from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
 
-# Khởi tạo SentenceTransformer local (384 chiều)
+# Embedding model local (nhẹ, 384-d)
 _EMB_MODEL_NAME = os.getenv("EMB_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 _sbert = SentenceTransformer(_EMB_MODEL_NAME)  # lần đầu tải ~100MB
 
-# ChromaDB (local persistent)
+# ChromaDB (persistent local)
 CHROMA_DIR = os.getenv("CHROMA_DIR", ".chroma")
 chroma_client = chromadb.PersistentClient(
     path=CHROMA_DIR,
@@ -20,14 +20,12 @@ _COLLECTION = "study_docs"
 _collection = chroma_client.get_or_create_collection(name=_COLLECTION)
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    # Lấy numpy array để .tolist() an toàn
     vecs = _sbert.encode(
         texts,
-        convert_to_numpy=True,           # <— quan trọng
-        normalize_embeddings=True        # giúp search ổn định
+        convert_to_numpy=True,      # để .tolist() OK
+        normalize_embeddings=True
     )
     return vecs.tolist()
-
 
 def upsert_doc(doc_id: str, chunks: List[str]) -> None:
     if not chunks:
@@ -40,7 +38,7 @@ def upsert_doc(doc_id: str, chunks: List[str]) -> None:
 def search_similar(query: str, k: int = 6) -> List[Dict[str, Any]]:
     emb = embed_texts([query])[0]
     res = _collection.query(query_embeddings=[emb], n_results=k)
-    out = []
+    out: List[Dict[str, Any]] = []
     for docs, metas in zip(res.get("documents", [[]])[0], res.get("metadatas", [[]])[0]):
         out.append({"text": docs, "meta": metas or {}})
     return out

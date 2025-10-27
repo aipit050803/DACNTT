@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
+# app/schemas.py
+from pydantic import BaseModel
+from typing import List, Dict
 
 class UploadResp(BaseModel):
     doc_id: str
@@ -8,6 +9,7 @@ class DocMeta(BaseModel):
     id: str
     title: str
     status: str = "processing"  # processing | done | failed
+    message: str | None = None
 
 class SummarySection(BaseModel):
     title: str
@@ -32,10 +34,7 @@ class QuizItem(BaseModel):
 class ChatSessionResp(BaseModel):
     session_id: str
 
-class ChatMessageReq(BaseModel):
-    session_id: str
-    question: str
-
 class ChatMessageResp(BaseModel):
     answer: str
-    citations: List[dict] = []  # [{"page": 3, "heading": "..."}]
+    citations: List[Dict] = []
+
